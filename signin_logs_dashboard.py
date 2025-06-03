@@ -4,13 +4,64 @@ import json
 import numpy as np
 import pydeck as pdk
 import plotly.express as px
+from jsonschema import validate, ValidationError
 
 st.set_page_config(page_title="Azure AD Sign-in Logs", layout="wide")
 
 st.title("🔐 Azure AD Sign-in Logs Viewer")
 st.markdown("Visualize and analyze sign-in logs with KPIs, filters, failure analysis, MFA, device data, and geolocation.")
 
+# Define maximum file size in MB
+MAX_MB = 50
+
+# Define expected JSON schema
+expected_schema = {
+    "type": "object",
+    "properties": {
+        "events": {
+            "type": "array",
+            "items": {"type": "object"}
+        }
+    },
+    "required": ["events"]
+}
+
 uploaded_file = st.file_uploader("📁 Upload the exported JSON file", type="json")
+
+if uploaded_file is not None:
+    # Check file size
+    uploaded_file.seek(0, 2)  # Move to end
+    file_size = uploaded_file.tell()
+    uploaded_file.seek(0)     # Rewind
+
+    if file_size > MAX_MB * 1024 * 1024:
+        st.error(f"🚫 File too large. Maximum allowed size is {MAX_MB} MB.")
+    else:
+        try:
+            # Try to load and parse the JSON
+            data = json.load(uploaded_file)
+
+            # Validate JSON structure using schema
+            validate(instance=data, schema=expected_schema)
+
+            st.success("✅ JSON loaded and validated successfully!")
+            st.subheader("📁 JSON Preview")
+            st.json(data)
+
+            # Example: Use the events data
+            events = data.get("events", [])
+            st.write(f"Total events: {len(events)}")
+
+            # Add your dashboard logic here
+            # For example:
+            # st.dataframe(events)
+
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Invalid JSON format: {e}")
+        except ValidationError as e:
+            st.error(f"❌ JSON structure is not valid: {e.message}")
+        except Exception as e:
+            st.error(f"❌ Unexpected error: {e}")
 
 def parse_logs(logs):
     df = pd.DataFrame(logs)
